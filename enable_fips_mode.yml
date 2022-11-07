@@ -1,0 +1,13 @@
+---
+- name: Update /etc/default/grub
+  replace:
+    path: /etc/default/grub
+    regexp: fips=.
+    replace: fips=1
+
+- name: Rebuild grub.cfg file
+  shell: grub2-mkconfig -o /boot/grub2/grub.cfg
+
+- name: Reboot server for FIPS mode
+  reboot:
+    reboot_timeout: 1800

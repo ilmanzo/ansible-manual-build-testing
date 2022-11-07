@@ -1,0 +1,78 @@
+- name: checks FIPS 140-2 pattern specific package installed
+  hosts: all
+  tasks:
+
+  - name: pattern installation check
+    zypper:
+      name: fips
+      type: pattern
+      state: present
+      update_cache: yes
+      force: yes
+
+  - name: remove base fips pattern
+    zypper:
+      name: patterns-base-fips
+      state: absent
+
+  - name: install enterprise fips package
+    zypper:
+      name: patterns-server-enterprise-fips
+      state: present
+      force: yes
+
+  - name: package installation check
+    zypper:
+      name:
+        - dracut-fips
+        - openssh-fips
+        - fipscheck
+      state: present
+    check_mode: true
+    register: package_check
+
+  - name: debug package var
+    debug:
+      var: package_check
+
+  - name: enable fips mode
+    include: enable_fips_mode.yml
+
+  - name: ensure fips kernel mode is enabled
+    lineinfile:
+      name: /proc/sys/crypto/fips_enabled
+      line: "1"
+      state: present
+    check_mode: yes
+    register: proc_fips
+    failed_when: (proc_fips is changed) or (proc_fips is failed)
+
+  - name: check md5 operation should be denied
+    shell: "openssl md5 /etc/passwd"
+    register: cmd
+    ignore_errors: true
+    failed_when: "'md5 is not a known digest' not in cmd.stderr"
+
+  - name: disable fips mode
+    include: disable_fips_mode.yml
+
+  - name: ensure fips kernel mode is disabled
+    lineinfile:
+      name: /proc/sys/crypto/fips_enabled
+      line: "0"
+      state: present
+    check_mode: yes
+    register: proc_fips
+    failed_when: (proc_fips is changed) or (proc_fips is failed)
+
+  - name: check md5 operation in FIPS env
+    shell: "OPENSSL_FIPS=1 openssl md5 /etc/passwd"
+    register: cmd
+    ignore_errors: true
+    failed_when: "'md5 is not a known digest' not in cmd.stderr"
+
+  - name: debug cmd
+    debug:
+      var: cmd
+
+
